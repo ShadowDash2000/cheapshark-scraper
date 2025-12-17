@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -16,7 +18,7 @@ func main() {
 	}
 	defer f.Close()
 
-	s := NewScraper(context.Background(), outName, f)
+	s := NewScraper(context.Background(), outName, f, rate.Every(2*time.Second), 1)
 	s.writeHeader()
 	s.processAllPages()
 	s.writeFooter()

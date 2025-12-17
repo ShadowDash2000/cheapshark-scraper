@@ -4,26 +4,30 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"math/rand/v2"
 	"net/http"
 	"os"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 type Scraper struct {
 	ctx        context.Context
 	client     *http.Client
+	limiter    *rate.Limiter
 	f          *os.File
 	outName    string
 	wroteFirst bool
 	wroteCount int64
 }
 
-func NewScraper(ctx context.Context, outName string, f *os.File) *Scraper {
+func NewScraper(ctx context.Context, outName string, f *os.File, limit rate.Limit, burst int) *Scraper {
 	return &Scraper{
 		ctx:     ctx,
 		client:  http.DefaultClient,
+		limiter: rate.NewLimiter(limit, burst),
 		f:       f,
 		outName: outName,
 	}
@@ -93,7 +97,10 @@ func (s *Scraper) processAllPages() {
 		log.Printf("Page %d scraped", page)
 		page++
 
-		time.Sleep(rand.N(100 * time.Millisecond))
+		if err = s.limiter.Wait(s.ctx); err != nil {
+			log.Printf("Wait error: %v", err)
+			return
+		}
 	}
 }
 
@@ -113,6 +120,15 @@ func (s *Scraper) getPage(ctx context.Context, page uint) ([]Deal, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
+		}
+
+		return nil, fmt.Errorf("bad status code: %d, response: %s", res.StatusCode, string(body))
+	}
 
 	var deals []Deal
 	if err = json.NewDecoder(res.Body).Decode(&deals); err != nil {
