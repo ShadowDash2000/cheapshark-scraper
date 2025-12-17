@@ -1,7 +1,7 @@
 name: Run Cheapshark Scraper and Upload JSON
 
 on:
-  workflow_dispatch:  # allows manual trigger
+  workflow_dispatch:  # allows manual trigger.
   schedule:
     - cron: '0 1 * * 0'  # every Sunday at 01:00 UTC
 
