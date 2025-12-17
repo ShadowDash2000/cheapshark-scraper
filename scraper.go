@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -82,10 +83,13 @@ func (s *Scraper) writeItemBytes(b []byte) {
 func (s *Scraper) processAllPages() {
 	page := uint(0)
 	for {
-		res, err := s.getPage(s.ctx, page)
+		res, totalPages, err := s.getPage(s.ctx, page)
 		if err != nil {
 			log.Printf("Fetch page %d error: %v", page, err)
 			return
+		}
+		if page > totalPages {
+			break
 		}
 		for _, deal := range res {
 			b, err := json.Marshal(deal)
@@ -105,10 +109,10 @@ func (s *Scraper) processAllPages() {
 	}
 }
 
-func (s *Scraper) getPage(ctx context.Context, page uint) ([]Deal, error) {
+func (s *Scraper) getPage(ctx context.Context, page uint) ([]Deal, uint, error) {
 	u, err := url.Parse("https://www.cheapshark.com/api/1.0/deals")
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	q := u.Query()
@@ -119,28 +123,33 @@ func (s *Scraper) getPage(ctx context.Context, page uint) ([]Deal, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	res, err := s.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
 		body, err := io.ReadAll(res.Body)
 		if err != nil {
-			return nil, fmt.Errorf("bad status code: %d", res.StatusCode)
+			return nil, 0, fmt.Errorf("bad status code: %d", res.StatusCode)
 		}
 
-		return nil, fmt.Errorf("bad status code: %d, response: %s", res.StatusCode, string(body))
+		return nil, 0, fmt.Errorf("bad status code: %d, response: %s", res.StatusCode, string(body))
 	}
 
 	var deals []Deal
 	if err = json.NewDecoder(res.Body).Decode(&deals); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return deals, nil
+	totalPages, err := strconv.ParseUint(res.Header.Get("x-total-page-count"), 10, 64)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return deals, uint(totalPages), nil
 }
