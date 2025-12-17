@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -105,15 +106,21 @@ func (s *Scraper) processAllPages() {
 }
 
 func (s *Scraper) getPage(ctx context.Context, page uint) ([]Deal, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.cheapshark.com/api/1.0/deals", nil)
+	u, err := url.Parse("https://www.cheapshark.com/api/1.0/deals")
 	if err != nil {
 		return nil, err
 	}
 
-	req.URL.Query().Add("storeID", "1")
-	req.URL.Query().Add("page", fmt.Sprint(page))
-	req.URL.Query().Add("sortBy", "Release")
-	req.URL.RawQuery = req.URL.Query().Encode()
+	q := u.Query()
+	q.Set("storeID", "1")
+	q.Set("page", fmt.Sprint(page))
+	q.Set("sortBy", "Release")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	res, err := s.client.Do(req)
 	if err != nil {
