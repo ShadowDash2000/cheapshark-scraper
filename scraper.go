@@ -117,7 +117,7 @@ func (s *Scraper) getPage(ctx context.Context, page uint) ([]Deal, uint, error) 
 
 	q := u.Query()
 	q.Set("storeID", "1")
-	q.Set("page", fmt.Sprint(page))
+	q.Set("pageNumber", fmt.Sprint(page))
 	q.Set("sortBy", "Release")
 	u.RawQuery = q.Encode()
 
