@@ -1,5 +1,5 @@
 module cheapshark-scraper
 
-go 1.25
+go 1.27.0
 
-require golang.org/x/time v0.14.0
+require golang.org/x/time v0.15.0
